@@ -968,6 +968,9 @@ h1 > span {
   gap: 10px;
   color: #739b80;
   font-size: 12px;
+  background: linear-gradient(90deg, #edf3ee 0%, #f8fbf8 45%, #edf3ee 100%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 .loader {
   height: 18px;
@@ -984,6 +987,71 @@ h1 > span {
   to {
     transform: rotate(360deg);
   }
+}
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+.skeleton {
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #edf2ed 0%, #f8faf8 45%, #edf2ed 100%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.location-skeleton-list {
+  padding: 0 9px;
+}
+.location-skeleton {
+  display: flex;
+  min-height: 91px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 17px 0 16px;
+  border-bottom: 1px solid #edf0ec;
+}
+.location-skeleton > div {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  padding-top: 2px;
+}
+.skeleton-icon {
+  width: 37px;
+  height: 39px;
+  border-radius: 7px;
+}
+.skeleton-line {
+  height: 9px;
+}
+.skeleton-title {
+  width: 58%;
+}
+.skeleton-address {
+  width: 82%;
+  height: 7px;
+}
+.skeleton-tag {
+  width: 31%;
+  height: 15px;
+  margin-top: 4px;
+}
+.comment-skeleton {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.skeleton-comment-name {
+  width: 34%;
+}
+.skeleton-comment-text {
+  width: 92%;
+  height: 8px;
+}
+.skeleton-comment-text.short {
+  width: 66%;
 }
 .list-mode .map-panel {
   display: none;
@@ -1606,6 +1674,30 @@ h1 > span {
 }
 .management-location-list article:last-child {
   border-bottom: 0;
+}
+.manager-skeleton-list {
+  padding: 0 14px;
+}
+.manager-skeleton-row {
+  display: grid;
+  gap: 7px;
+  min-height: 66px;
+  padding: 13px 0;
+  border-bottom: 1px solid #e8eee8;
+}
+.manager-skeleton-row:last-child {
+  border-bottom: 0;
+}
+.manager-skeleton-title {
+  width: 36%;
+}
+.manager-skeleton-detail {
+  width: 58%;
+  height: 7px;
+}
+.manager-skeleton-comment {
+  width: 88%;
+  height: 8px;
 }
 .management-location-list strong,
 .management-location-list span,

@@ -74,7 +74,8 @@ export default function Explorer({ locationId }: { locationId?: string }) {
     [dataMode, setDataMode] = useState<"loading" | "database" | "demo">(
       "loading",
     ),
-    [loading, setLoading] = useState(false),
+    [loading, setLoading] = useState(true),
+    [commentsLoading, setCommentsLoading] = useState(Boolean(locationId)),
     [total, setTotal] = useState(24),
     [page, setPage] = useState(1);
   const [modal, setModal] = useState(""),
@@ -156,9 +157,13 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             ]);
           setComments(data.comments);
           commentsRef.current = data.comments;
+          setCommentsLoading(false);
         }
       } catch (e) {
-        if (e instanceof Error && e.name !== "AbortError") notify(e.message);
+        if (e instanceof Error && e.name !== "AbortError") {
+          setCommentsLoading(false);
+          notify(e.message);
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -172,6 +177,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
     setSelected(loc);
     setCenter([loc.latitude, loc.longitude]);
     setComments([]);
+    setCommentsLoading(true);
   }, []);
   useEffect(() => {
     if (!selected?.id) return;
@@ -193,7 +199,10 @@ export default function Explorer({ locationId }: { locationId?: string }) {
         commentsRef.current = nextComments;
         setComments(nextComments);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setCommentsLoading(false);
+      });
     return () => controller.abort();
   }, [selected?.id, reload]);
   useEffect(() => {
@@ -291,6 +300,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
         comment: data.get("comment"),
       });
       realtimeCommentRefreshRef.current = true;
+      setCommentsLoading(true);
       notify("Komentar berhasil ditampilkan.");
       form.reset();
       refresh();
@@ -779,7 +789,9 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                   )}
                 </div>
                 <div className="location-list">
-                  {visible.length === 0 ? (
+                  {dataMode === "loading" && loading ? (
+                    <LocationListSkeleton />
+                  ) : visible.length === 0 ? (
                     <div className="empty-state">
                       <Search size={32} />
                       <h3>Lokasi tidak ditemukan</h3>
@@ -1088,27 +1100,33 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                         <MessageSquare size={17} />
                         Komentar <span>{comments.length}</span>
                       </h3>
-                      {comments.map((c) => (
-                        <div
-                          className={
-                            "comment " +
-                            (liveCommentIds.includes(c.id)
-                              ? "is-live-update"
-                              : "")
-                          }
-                          key={c.id}
-                        >
-                          <strong>{c.name}</strong>
-                          {liveCommentIds.includes(c.id) && (
-                            <span className="live-update-badge">Baru</span>
-                          )}
-                          <small>
-                            {new Date(c.created_at).toLocaleDateString("id-ID")}
-                          </small>
-                          <p>{c.comment}</p>
-                        </div>
-                      ))}
-                      {!comments.length && (
+                      {commentsLoading ? (
+                        <CommentListSkeleton />
+                      ) : (
+                        comments.map((c) => (
+                          <div
+                            className={
+                              "comment " +
+                              (liveCommentIds.includes(c.id)
+                                ? "is-live-update"
+                                : "")
+                            }
+                            key={c.id}
+                          >
+                            <strong>{c.name}</strong>
+                            {liveCommentIds.includes(c.id) && (
+                              <span className="live-update-badge">Baru</span>
+                            )}
+                            <small>
+                              {new Date(c.created_at).toLocaleDateString(
+                                "id-ID",
+                              )}
+                            </small>
+                            <p>{c.comment}</p>
+                          </div>
+                        ))
+                      )}
+                      {!commentsLoading && !comments.length && (
                         <p className="muted">
                           Belum ada komentar. Bagikan informasi lapangan Anda.
                         </p>
@@ -1376,6 +1394,45 @@ export default function Explorer({ locationId }: { locationId?: string }) {
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function LocationListSkeleton() {
+  return (
+    <div
+      className="location-skeleton-list"
+      aria-label="Memuat daftar lokasi"
+      aria-busy="true"
+    >
+      {Array.from({ length: 5 }, (_, index) => (
+        <div className="location-skeleton" key={index}>
+          <span className="skeleton skeleton-icon" />
+          <div>
+            <span className="skeleton skeleton-line skeleton-title" />
+            <span className="skeleton skeleton-line skeleton-address" />
+            <span className="skeleton skeleton-line skeleton-tag" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CommentListSkeleton() {
+  return (
+    <div
+      className="comment-skeleton-list"
+      aria-label="Memuat komentar"
+      aria-busy="true"
+    >
+      {Array.from({ length: 2 }, (_, index) => (
+        <div className="comment-skeleton" key={index}>
+          <span className="skeleton skeleton-line skeleton-comment-name" />
+          <span className="skeleton skeleton-line skeleton-comment-text" />
+          <span className="skeleton skeleton-line skeleton-comment-text short" />
+        </div>
+      ))}
     </div>
   );
 }

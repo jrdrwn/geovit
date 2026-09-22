@@ -70,7 +70,8 @@ export default function Manager({
     [commentToDelete, setCommentToDelete] = useState<string | null>(null),
     [slsToDelete, setSlsToDelete] = useState<SLS | null>(null),
     [locationToDelete, setLocationToDelete] = useState<Location | null>(null),
-    [locationSearch, setLocationSearch] = useState("");
+    [locationSearch, setLocationSearch] = useState(""),
+    [managementLoading, setManagementLoading] = useState(mode === "manage");
   const [polygon, setPolygon] = useState<[number, number][]>(
     slsEdit?.boundary || [],
   );
@@ -124,17 +125,29 @@ export default function Manager({
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
     );
   }
-  const load = () =>
-    fetch("/api/data?manage=1")
-      .then((r) => r.json())
-      .then((d) => {
-        setModeration(d.comments || []);
-        setUsers(d.users || []);
-        setManagedLocations(d.locations || locations);
-      })
-      .catch(() => notify("Data pengelolaan tidak dapat dimuat."));
+  const load = async () => {
+    setManagementLoading(true);
+    try {
+      const response = await fetch("/api/data?manage=1");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Gagal memuat data.");
+      setModeration(data.comments || []);
+      setUsers(data.users || []);
+      setManagedLocations(data.locations || locations);
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Data pengelolaan tidak dapat dimuat.",
+      );
+    } finally {
+      setManagementLoading(false);
+    }
+  };
   useEffect(() => {
-    if (mode === "manage") load();
+    if (mode !== "manage") return;
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const center = useMemo<[number, number]>(
     () => [Number(form.latitude), Number(form.longitude)],
@@ -151,14 +164,14 @@ export default function Manager({
         ? [
             {
               ...form,
-              id: location?.id || "preview",
+              id: form.id || "preview",
               latitude: center[0],
               longitude: center[1],
               visits: 0,
             },
           ]
         : [],
-    [form, location, center, coordinatesValid],
+    [form, center, coordinatesValid],
   );
   const visibleManagedLocations = useMemo(() => {
     const needle = locationSearch.trim().toLowerCase();
@@ -167,6 +180,13 @@ export default function Manager({
       `${item.title} ${item.address}`.toLowerCase().includes(needle),
     );
   }, [managedLocations, locationSearch]);
+  function startNewLocation() {
+    setForm({ ...empty, sls_id: sls[0]?.id || "" });
+    setPicking(false);
+    setLocationAccuracy(null);
+    setConfirmDelete(false);
+    setTab("location");
+  }
   async function perform(body: unknown, message: string, close = false) {
     setBusy(true);
     try {
@@ -174,7 +194,7 @@ export default function Manager({
       notify(message);
       if (close) onDone();
       else {
-        load();
+        void load();
         onRefresh();
       }
       return true;
@@ -274,7 +294,7 @@ export default function Manager({
       <h2>
         {mode === "manage"
           ? "Kelola data sensus"
-          : location
+          : form.id
             ? "Edit lokasi"
             : "Tambahkan lokasi baru"}
       </h2>
@@ -290,7 +310,9 @@ export default function Manager({
             <button
               className={tab === t ? "active" : ""}
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() =>
+                t === "location" ? startNewLocation() : setTab(t)
+              }
             >
               {
                 {
@@ -378,7 +400,7 @@ export default function Manager({
               <h3>Manajemen lokasi</h3>
               <p>{managedLocations.length} lokasi tersedia untuk dikelola.</p>
             </div>
-            <button type="button" onClick={() => setTab("location")}>
+            <button type="button" onClick={startNewLocation}>
               <Plus size={15} /> Tambah
             </button>
           </div>
@@ -389,41 +411,48 @@ export default function Manager({
             value={locationSearch}
             onChange={(event) => setLocationSearch(event.target.value)}
           />
-          <div className="management-location-list">
-            {visibleManagedLocations.map((item) => {
-              const region = sls.find((s) => s.id === item.sls_id);
-              return (
-                <article key={item.id}>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span>{item.address || "Tanpa alamat"}</span>
-                    <small>{region?.code || "SLS tidak tersedia"}</small>
-                  </div>
-                  <div className="management-row-actions">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm({ ...empty, ...item, sls_id: item.sls_id });
-                        setPicking(false);
-                        setTab("location");
-                      }}
-                    >
-                      Edit
-                    </button>
-                    {user.role === "admin" && (
+          <div
+            className="management-location-list"
+            aria-busy={managementLoading}
+          >
+            {managementLoading ? (
+              <ManagerListSkeleton />
+            ) : (
+              visibleManagedLocations.map((item) => {
+                const region = sls.find((s) => s.id === item.sls_id);
+                return (
+                  <article key={item.id}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{item.address || "Tanpa alamat"}</span>
+                      <small>{region?.code || "SLS tidak tersedia"}</small>
+                    </div>
+                    <div className="management-row-actions">
                       <button
                         type="button"
-                        className="danger"
-                        onClick={() => setLocationToDelete(item)}
+                        onClick={() => {
+                          setForm({ ...empty, ...item, sls_id: item.sls_id });
+                          setPicking(false);
+                          setTab("location");
+                        }}
                       >
-                        <Trash2 size={15} />
+                        Edit
                       </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-            {!visibleManagedLocations.length && (
+                      {user.role === "admin" && (
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => setLocationToDelete(item)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })
+            )}
+            {!managementLoading && !visibleManagedLocations.length && (
               <p className="muted">Lokasi tidak ditemukan.</p>
             )}
           </div>
@@ -629,7 +658,7 @@ export default function Manager({
             </div>
           )}
           <div className="form-actions">
-            {location && user.role === "admin" && (
+            {form.id && user.role === "admin" && (
               <button
                 type="button"
                 className="danger"
@@ -657,7 +686,7 @@ export default function Manager({
                 disabled={busy}
                 onClick={() =>
                   perform(
-                    { action: "delete-location", id: location?.id },
+                    { action: "delete-location", id: form.id },
                     "Lokasi dihapus.",
                     true,
                   )
@@ -673,15 +702,17 @@ export default function Manager({
         </form>
       )}
       {tab === "comments" && (
-        <div className="moderation-list">
-          {!moderation.length && (
+        <div className="moderation-list" aria-busy={managementLoading}>
+          {managementLoading ? (
+            <ManagerCommentSkeleton />
+          ) : !moderation.length && (
             <div className="empty-state">
               <Check size={32} />
               <h3>Belum ada komentar</h3>
               <p>Komentar yang dikirim pengunjung akan muncul di sini.</p>
             </div>
           )}
-          {moderation.map((c) => (
+          {!managementLoading && moderation.map((c) => (
             <article key={c.id}>
               <header>
                 <strong>{c.name}</strong>
@@ -1056,5 +1087,32 @@ export default function Manager({
         </>
       )}
     </>
+  );
+}
+
+function ManagerListSkeleton() {
+  return (
+    <div className="manager-skeleton-list" aria-label="Memuat lokasi">
+      {Array.from({ length: 5 }, (_, index) => (
+        <div className="manager-skeleton-row" key={index}>
+          <span className="skeleton skeleton-line manager-skeleton-title" />
+          <span className="skeleton skeleton-line manager-skeleton-detail" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ManagerCommentSkeleton() {
+  return (
+    <div className="manager-skeleton-list" aria-label="Memuat komentar">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div className="manager-skeleton-row" key={index}>
+          <span className="skeleton skeleton-line manager-skeleton-title" />
+          <span className="skeleton skeleton-line manager-skeleton-comment" />
+          <span className="skeleton skeleton-line manager-skeleton-detail" />
+        </div>
+      ))}
+    </div>
   );
 }
