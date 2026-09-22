@@ -74,9 +74,16 @@ export async function GET(req: NextRequest) {
                   email: users.email,
                   role: users.role,
                 })
-                .from(users)
-                .limit(100)
+            .from(users)
+            .limit(100)
             : [],
+        locations: (
+          await pool!.query(
+            `SELECT l.*, (SELECT COUNT(*)::int FROM visits v WHERE v.location_id=l.id) AS visits,
+              (SELECT image_url FROM location_images i WHERE i.location_id=l.id ORDER BY is_primary DESC,sort_order LIMIT 1) AS image_url
+             FROM locations l ORDER BY l.updated_at DESC,l.id LIMIT 500`,
+          )
+        ).rows,
       });
     }
     const id = p.get("id"),
@@ -348,20 +355,21 @@ export async function POST(req: NextRequest) {
       else await db.insert(sls).values({ ...input, id: crypto.randomUUID() });
     } else if (action === "delete-sls") {
       const id = z.string().parse(body.id);
-      const linkedLocation = await db
-        .select({ id: locations.id })
-        .from(locations)
-        .where(eq(locations.sls_id, id))
-        .limit(1);
-      if (linkedLocation.length)
-        return Response.json(
-          {
-            error:
-              "SLS masih dipakai oleh lokasi. Pindahkan atau hapus lokasi tersebut terlebih dahulu.",
-          },
-          { status: 409 },
-        );
-      await db.delete(sls).where(eq(sls.id, id));
+      const deletedLocations = await db.transaction(async (tx) => {
+        const linked = await tx
+          .select({ id: locations.id })
+          .from(locations)
+          .where(eq(locations.sls_id, id));
+        for (const location of linked) {
+          await tx
+            .delete(locationImages)
+            .where(eq(locationImages.location_id, location.id));
+          await tx.delete(locations).where(eq(locations.id, location.id));
+        }
+        await tx.delete(sls).where(eq(sls.id, id));
+        return linked.length;
+      });
+      return Response.json({ ok: true, deletedLocations });
     } else if (action === "moderate") {
       await db
         .update(comments)

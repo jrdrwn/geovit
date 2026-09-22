@@ -31,21 +31,25 @@ export default function Manager({
   mode,
   user,
   sls,
+  locations,
   location,
   notify,
   onDone,
+  onRefresh,
   onSignOut,
 }: {
   mode: string;
   user: User;
   sls: SLS[];
+  locations: Location[];
   location: Location | null;
   notify: (s: string) => void;
   onDone: () => void;
+  onRefresh: () => void;
   onSignOut: () => void;
 }) {
   const [tab, setTab] = useState(mode === "manage" ? "comments" : "location"),
-    [form, setForm] = useState({
+    [form, setForm] = useState<typeof empty & Partial<Location>>({
       ...empty,
       ...location,
       sls_id: location?.sls_id || sls[0]?.id || "",
@@ -57,13 +61,16 @@ export default function Manager({
     [confirmDelete, setConfirmDelete] = useState(false);
   const [moderation, setModeration] = useState<Comment[]>([]),
     [users, setUsers] = useState<User[]>([]),
+    [managedLocations, setManagedLocations] = useState<Location[]>(locations),
     [rows, setRows] = useState<
       { data: Record<string, unknown>; error: string; line: number }[]
     >([]),
     [importName, setImportName] = useState(""),
     [slsEdit, setSlsEdit] = useState<SLS | null>(null),
     [commentToDelete, setCommentToDelete] = useState<string | null>(null),
-    [slsToDelete, setSlsToDelete] = useState<SLS | null>(null);
+    [slsToDelete, setSlsToDelete] = useState<SLS | null>(null),
+    [locationToDelete, setLocationToDelete] = useState<Location | null>(null),
+    [locationSearch, setLocationSearch] = useState("");
   const [polygon, setPolygon] = useState<[number, number][]>(
     slsEdit?.boundary || [],
   );
@@ -123,6 +130,7 @@ export default function Manager({
       .then((d) => {
         setModeration(d.comments || []);
         setUsers(d.users || []);
+        setManagedLocations(d.locations || locations);
       })
       .catch(() => notify("Data pengelolaan tidak dapat dimuat."));
   useEffect(() => {
@@ -152,15 +160,27 @@ export default function Manager({
         : [],
     [form, location, center, coordinatesValid],
   );
+  const visibleManagedLocations = useMemo(() => {
+    const needle = locationSearch.trim().toLowerCase();
+    if (!needle) return managedLocations;
+    return managedLocations.filter((item) =>
+      `${item.title} ${item.address}`.toLowerCase().includes(needle),
+    );
+  }, [managedLocations, locationSearch]);
   async function perform(body: unknown, message: string, close = false) {
     setBusy(true);
     try {
       await api(body);
       notify(message);
       if (close) onDone();
-      else load();
+      else {
+        load();
+        onRefresh();
+      }
+      return true;
     } catch (e) {
       notify((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -263,6 +283,7 @@ export default function Manager({
         <div className="manager-tabs">
           {[
             "comments",
+            "locations",
             "location",
             ...(user.role === "admin" ? ["sls", "import", "users"] : []),
           ].map((t) => (
@@ -274,6 +295,7 @@ export default function Manager({
               {
                 {
                   comments: "Komentar",
+                  locations: "Manajemen lokasi",
                   location: "Tambah lokasi",
                   sls: "Wilayah SLS",
                   import: "Import data",
@@ -286,6 +308,126 @@ export default function Manager({
             <LogOut size={15} />
           </button>
         </div>
+      )}
+      {(slsToDelete || locationToDelete) && (
+        <div className="manager-confirm" role="alertdialog" aria-modal="true">
+          <div>
+            <span className="modal-kicker">KONFIRMASI PENGHAPUSAN</span>
+            {slsToDelete ? (
+              <>
+                <h3>Hapus {slsToDelete.code}?</h3>
+                <p>
+                  {managedLocations.filter(
+                    (item) => item.sls_id === slsToDelete.id,
+                  ).length} lokasi di wilayah ini, termasuk kunjungan, komentar,
+                  dan referensi foto, akan dihapus permanen.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3>Hapus {locationToDelete?.title}?</h3>
+                <p>
+                  Lokasi ini beserta kunjungan, komentar, dan referensi fotonya
+                  akan dihapus permanen.
+                </p>
+              </>
+            )}
+            <div className="form-actions">
+              <button
+                type="button"
+                className="danger"
+                disabled={busy}
+                onClick={async () => {
+                  const removed = slsToDelete
+                    ? await perform(
+                        { action: "delete-sls", id: slsToDelete.id },
+                        "SLS beserta lokasi di dalamnya dihapus.",
+                      )
+                    : await perform(
+                        { action: "delete-location", id: locationToDelete?.id },
+                        "Lokasi dihapus.",
+                      );
+                  if (removed) {
+                    setSlsToDelete(null);
+                    setLocationToDelete(null);
+                    setSlsEdit(null);
+                    setPolygon([]);
+                  }
+                }}
+              >
+                Hapus permanen
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setSlsToDelete(null);
+                  setLocationToDelete(null);
+                }}
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === "locations" && (
+        <section className="location-management">
+          <div className="management-heading">
+            <div>
+              <h3>Manajemen lokasi</h3>
+              <p>{managedLocations.length} lokasi tersedia untuk dikelola.</p>
+            </div>
+            <button type="button" onClick={() => setTab("location")}>
+              <Plus size={15} /> Tambah
+            </button>
+          </div>
+          <input
+            className="management-search"
+            aria-label="Cari lokasi untuk dikelola"
+            placeholder="Cari nama atau alamat lokasi…"
+            value={locationSearch}
+            onChange={(event) => setLocationSearch(event.target.value)}
+          />
+          <div className="management-location-list">
+            {visibleManagedLocations.map((item) => {
+              const region = sls.find((s) => s.id === item.sls_id);
+              return (
+                <article key={item.id}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>{item.address || "Tanpa alamat"}</span>
+                    <small>{region?.code || "SLS tidak tersedia"}</small>
+                  </div>
+                  <div className="management-row-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm({ ...empty, ...item, sls_id: item.sls_id });
+                        setPicking(false);
+                        setTab("location");
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {user.role === "admin" && (
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => setLocationToDelete(item)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+            {!visibleManagedLocations.length && (
+              <p className="muted">Lokasi tidak ditemukan.</p>
+            )}
+          </div>
+        </section>
       )}
       {tab === "location" && (
         <form
@@ -730,28 +872,6 @@ export default function Manager({
               </button>
             </div>
           </form>
-          {slsToDelete && (
-            <div className="info-box">
-              Hapus {slsToDelete.code}? SLS yang masih memiliki lokasi tidak
-              dapat dihapus.
-              <button
-                type="button"
-                className="danger"
-                onClick={() =>
-                  perform(
-                    { action: "delete-sls", id: slsToDelete.id },
-                    "SLS dihapus.",
-                    true,
-                  )
-                }
-              >
-                Hapus
-              </button>
-              <button type="button" onClick={() => setSlsToDelete(null)}>
-                Batal
-              </button>
-            </div>
-          )}
         </>
       )}
       {tab === "import" && (

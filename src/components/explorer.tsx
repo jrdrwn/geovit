@@ -1354,6 +1354,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                   mode={modal}
                   user={user}
                   sls={sls}
+                  locations={locations}
                   location={modal === "edit-selected" ? selected : null}
                   notify={notify}
                   onDone={() => {
@@ -1362,6 +1363,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                     if (locationId) router.push("/");
                     refresh();
                   }}
+                  onRefresh={refresh}
                   onSignOut={() =>
                     signOut({ redirect: false }).then(() => {
                       setUser(null);

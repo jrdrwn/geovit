@@ -100,30 +100,6 @@ test(
               .status,
             403,
           );
-          const linkedSls = await post(
-            { action: "delete-sls", id: region },
-            adminCookie,
-          );
-          assert.equal(linkedSls.status, 409);
-          assert.match(
-            (await linkedSls.json()).error,
-            /SLS masih dipakai oleh lokasi/,
-          );
-          const emptyRegion = "empty-sls-" + suffix;
-          await pool.query("INSERT INTO sls(id,code,name) VALUES($1,$2,$3)", [
-            emptyRegion,
-            "SLS-EMPTY-" + suffix,
-            "Empty SLS",
-          ]);
-          assert.equal(
-            (await post({ action: "delete-sls", id: emptyRegion }, adminCookie))
-              .status,
-            200,
-          );
-          const deleted = await pool.query("SELECT id FROM sls WHERE id=$1", [
-            emptyRegion,
-          ]);
-          assert.equal(deleted.rowCount, 0);
           assert.equal((await fetch(base + "/api/data?manage=1")).status, 401);
         },
       );
@@ -304,6 +280,39 @@ test(
           (
             await pool.query("SELECT id FROM comments WHERE location_id=$1", [
               loc,
+            ])
+          ).rowCount,
+          0,
+        );
+      });
+      await t.test("admin deletes an SLS together with its locations", async () => {
+        const disposableSls = "delete-sls-" + suffix;
+        const disposableLocation = "delete-location-" + suffix;
+        await pool.query("INSERT INTO sls(id,code,name) VALUES($1,$2,$3)", [
+          disposableSls,
+          "SLS-DELETE-" + suffix,
+          "Disposable SLS",
+        ]);
+        await pool.query(
+          "INSERT INTO locations(id,sls_id,title,latitude,longitude) VALUES($1,$2,$3,$4,$5)",
+          [disposableLocation, disposableSls, "Disposable location", -6.25, 106.82],
+        );
+        const result = await post(
+          { action: "delete-sls", id: disposableSls },
+          adminCookie,
+        );
+        assert.equal(result.status, 200);
+        assert.equal((await result.json()).deletedLocations, 1);
+        assert.equal(
+          (
+            await pool.query("SELECT id FROM sls WHERE id=$1", [disposableSls])
+          ).rowCount,
+          0,
+        );
+        assert.equal(
+          (
+            await pool.query("SELECT id FROM locations WHERE id=$1", [
+              disposableLocation,
             ])
           ).rowCount,
           0,
