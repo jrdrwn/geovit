@@ -1,20 +1,20 @@
-import { NextRequest } from "next/server";
-import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
-import { hash } from "bcryptjs";
-import { db, pool } from "@/lib/db";
 import { currentUser } from "@/auth";
+import { seedLocations, seedSls } from "@/lib/data";
+import { db, pool } from "@/lib/db";
+import { readDemo, updateDemo } from "@/lib/demo";
 import {
-  sls,
-  locations,
-  visits,
   comments,
   locationImages,
+  locations,
+  sls,
   users,
+  visits,
 } from "@/lib/schema";
-import { seedLocations, seedSls } from "@/lib/data";
-import { readDemo, updateDemo } from "@/lib/demo";
 import { locationInput, slsInput } from "@/lib/validation";
+import { hash } from "bcryptjs";
+import { desc, eq } from "drizzle-orm";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 export const dynamic = "force-dynamic";
 const limiters = new Map<string, { n: number; at: number }>();
 function rateLimit(id: string) {
@@ -337,6 +337,28 @@ export async function POST(req: NextRequest) {
               });
         }
       });
+      const [saved] = await db
+        .select()
+        .from(locations)
+        .where(eq(locations.id, target));
+      const [image] = await db
+        .select({ image_url: locationImages.image_url })
+        .from(locationImages)
+        .where(eq(locationImages.location_id, target))
+        .orderBy(desc(locationImages.is_primary), locationImages.sort_order)
+        .limit(1);
+      const visitRows = await db
+        .select({ id: visits.id })
+        .from(visits)
+        .where(eq(visits.location_id, target));
+      return Response.json({
+        ok: true,
+        location: {
+          ...saved,
+          image_url: image?.image_url ?? null,
+          visits: visitRows.length,
+        },
+      });
     } else if (action === "delete-location") {
       await db
         .delete(locations)
@@ -347,12 +369,14 @@ export async function POST(req: NextRequest) {
         .where(eq(comments.id, z.string().parse(body.id)));
     } else if (action === "sls") {
       const { id, ...input } = slsInput.parse(body.data);
+      const target = id || crypto.randomUUID();
       if (id)
         await db
           .update(sls)
           .set({ ...input, updated_at: new Date() })
           .where(eq(sls.id, id));
-      else await db.insert(sls).values({ ...input, id: crypto.randomUUID() });
+      else await db.insert(sls).values({ ...input, id: target });
+      return Response.json({ ok: true, sls: { id: target, ...input } });
     } else if (action === "delete-sls") {
       const id = z.string().parse(body.id);
       const deletedLocations = await db.transaction(async (tx) => {
@@ -431,13 +455,19 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: true });
   } catch (e) {
     console.error(e);
+    if (e instanceof z.ZodError)
+      return Response.json(
+        { error: "Data tidak valid: " + e.issues[0].message },
+        { status: 400 },
+      );
+    const pg = e as { code?: string };
+    if (pg?.code === "23505")
+      return Response.json(
+        { error: "Kode SLS sudah dipakai. Gunakan kode lain." },
+        { status: 409 },
+      );
     return Response.json(
-      {
-        error:
-          e instanceof z.ZodError
-            ? "Data tidak valid. Periksa semua isian."
-            : "Perubahan gagal. Periksa data, kode unik, dan keterkaitan SLS.",
-      },
+      { error: "Perubahan gagal. Periksa data, kode unik, dan keterkaitan SLS." },
       { status: 400 },
     );
   }

@@ -1,44 +1,48 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Comment, Location, seedLocations, seedSls, SLS } from "@/lib/data";
 import {
-  MapPin,
-  Map as MapIcon,
-  Layers,
-  LayoutGrid,
-  ArrowUpRight,
-  Search,
-  ChevronDown,
-  ChevronRight,
-  SlidersHorizontal,
-  House,
-  Check,
-  LocateFixed,
-  Maximize,
-  Plus,
-  LogIn,
-  ArrowLeft,
-  ArrowRight,
-  X,
-  Info,
-  HelpCircle,
-  Users,
-  CheckCheck,
-  Globe,
-  Compass,
-  LoaderCircle,
-  Copy,
-  MessageSquare,
-  ExternalLink,
-  PanelLeftClose,
-  CheckCircle2,
+    ArrowLeft,
+    ArrowRight,
+    ArrowUpRight,
+    Check,
+    CheckCheck,
+    CheckCircle2,
+    ChevronDown,
+    ChevronRight,
+    Compass,
+    Copy,
+    ExternalLink,
+    Globe,
+    HelpCircle,
+    House,
+    Info,
+    Layers,
+    LayoutGrid,
+    LoaderCircle,
+    LocateFixed,
+    LogIn,
+    Map as MapIcon,
+    MapPin,
+    Maximize,
+    MessageSquare,
+    PanelLeftClose,
+    Plus,
+    Search,
+    SlidersHorizontal,
+    Users,
+    X,
 } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { signIn, signOut } from "next-auth/react";
-import Map from "./map";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Manager from "./manager";
-import { Location, SLS, Comment, seedLocations, seedSls } from "@/lib/data";
+import Map from "./map";
 export type User = { id: string; name: string; email: string; role: string };
 export async function api(body: unknown) {
   const res = await fetch("/api/data", {
@@ -83,7 +87,6 @@ export default function Explorer({ locationId }: { locationId?: string }) {
     [reset, setReset] = useState(0),
     [boundary, setBoundary] = useState(false),
     [layers, setLayers] = useState(false),
-    [listView, setListView] = useState(false),
     [dataPanelOpen, setDataPanelOpen] = useState(false),
     [publicFiltersOpen, setPublicFiltersOpen] = useState(false),
     [center, setCenter] = useState<[number, number]>(),
@@ -94,6 +97,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
       Record<string, "new" | "visited" | "updated">
     >({}),
     [liveCommentIds, setLiveCommentIds] = useState<string[]>([]);
+  const [fitPoints, setFitPoints] = useState<[number, number][] | null>(null);
   const locationsRef = useRef<Location[]>(locations);
   const commentsRef = useRef<Comment[]>(comments);
   const revisionRef = useRef<string | null>(null);
@@ -265,8 +269,95 @@ export default function Explorer({ locationId }: { locationId?: string }) {
     setFilter(value);
     setPage(1);
     setSelected(null);
+    const region = sls.find((item) => item.id === value);
+    const boundary = region?.boundary?.filter(
+      (point) => Number.isFinite(point[0]) && Number.isFinite(point[1]),
+    );
+    const points =
+      boundary && boundary.length >= 2
+        ? boundary
+        : locations
+            .filter((location) => location.sls_id === value)
+            .map(
+              (location) =>
+                [location.latitude, location.longitude] as [number, number],
+            );
+    if (points.length) {
+      if (boundary && boundary.length >= 2) setFitPoints(boundary);
+      else setFitPoints(null);
+      setCenter([
+        points.reduce((sum, point) => sum + point[0], 0) / points.length,
+        points.reduce((sum, point) => sum + point[1], 0) / points.length,
+      ]);
+      setReset((current) => current + 1);
+    } else if (!value) {
+      setFitPoints(null);
+      setCenter([-6.184, 106.837]);
+      setReset((current) => current + 1);
+    }
   };
   const refresh = () => setReload((v) => v + 1);
+  const regionCenter = (region: SLS) => {
+    const points =
+      region.boundary?.length
+        ? region.boundary
+        : locationsRef.current
+            .filter((location) => location.sls_id === region.id)
+            .map(
+              (location) =>
+                [location.latitude, location.longitude] as [number, number],
+            );
+    return points.length
+      ? ([
+          points.reduce((sum, point) => sum + point[0], 0) / points.length,
+          points.reduce((sum, point) => sum + point[1], 0) / points.length,
+        ] as [number, number])
+      : null;
+  };
+  // Perubahan oleh pengelola langsung tampil tanpa menunggu polling revisi.
+  const applySlsChange = (region: SLS) => {
+    setSls((current) => {
+      const exists = current.some((item) => item.id === region.id);
+      return exists
+        ? current.map((item) => (item.id === region.id ? region : item))
+        : [...current, region];
+    });
+    const boundary = (region.boundary || []).filter(
+      (point) => Number.isFinite(point[0]) && Number.isFinite(point[1]),
+    );
+    const focus = regionCenter(region);
+    setFilter(region.id);
+    setPage(1);
+    setSelected(null);
+    setBoundary(true);
+    if (boundary.length >= 2) {
+      setFitPoints(boundary);
+    } else if (focus) {
+      setFitPoints(null);
+      setCenter(focus);
+    }
+    setReset((value) => value + 1);
+  };
+  const applyLocationCreated = (saved: Location) => {
+    const known = locationsRef.current.some((item) => item.id === saved.id);
+    locationsRef.current = known
+      ? locationsRef.current.map((item) => (item.id === saved.id ? saved : item))
+      : [saved, ...locationsRef.current];
+    setLocations(locationsRef.current);
+    if (!known) {
+      setTotal((value) => value + 1);
+      setStats((value) => ({
+        ...value,
+        total: value.total + 1,
+        visited: saved.status === "visited" ? value.visited + 1 : value.visited,
+      }));
+    }
+    setSelected(saved);
+    setFitPoints(null);
+    setCenter([saved.latitude, saved.longitude]);
+    if (saved.sls_id) setFilter(saved.sls_id);
+    setPage(1);
+  };
   async function visit() {
     if (!selected || busy) return;
     setBusy(true);
@@ -379,61 +470,16 @@ export default function Explorer({ locationId }: { locationId?: string }) {
     );
   };
   const selectedSls = sls.find((s) => s.id === selected?.sls_id);
+  const activeMappingSls = sls.find((s) => s.id === filter);
+  const mappingName = activeMappingSls
+    ? `${activeMappingSls.code} · ${activeMappingSls.name}`
+    : "Semua wilayah SLS";
+  const mappingDetail = activeMappingSls?.description || "Wilayah pemetaan";
   const publicView = !user;
   return (
     <div
       className={"app-shell " + (publicView ? "public-view" : "manager-view")}
     >
-      <aside className="rail">
-        <Link className="brand-symbol" href="/" aria-label="Beranda Geovit">
-          <MapPin size={26} strokeWidth={2.3} />
-          <span />
-        </Link>
-        <div className="rail-nav">
-          <button
-            className={!listView ? "rail-button active" : "rail-button"}
-            title="Peta lokasi"
-            onClick={() => {
-              setListView(false);
-              setModal("");
-            }}
-          >
-            <MapIcon size={22} />
-          </button>
-          <button
-            className={listView ? "rail-button active" : "rail-button"}
-            title="Daftar lokasi"
-            onClick={() => setListView(true)}
-          >
-            <LayoutGrid size={21} />
-          </button>
-          <button
-            className="rail-button"
-            title="Wilayah SLS"
-            onClick={() => setModal("regions")}
-          >
-            <Layers size={22} />
-          </button>
-          <div className="rail-divider" />
-          <button
-            className="rail-button"
-            title="Panduan penggunaan"
-            onClick={() => setModal("help")}
-          >
-            <HelpCircle size={21} />
-          </button>
-        </div>
-        <div className="rail-bottom">
-          <span className="live-dot" />
-          <button
-            className="avatar"
-            title={user?.name || "Masuk pengelola"}
-            onClick={() => setModal(user ? "manage" : "login")}
-          >
-            {user ? user.name.slice(0, 2).toUpperCase() : <Users size={18} />}
-          </button>
-        </div>
-      </aside>
       <div className="workspace">
         <header className="topbar">
           {publicView ? (
@@ -446,6 +492,38 @@ export default function Explorer({ locationId }: { locationId?: string }) {
               <small>Pemetaan Sensus</small>
             </Link>
           )}
+          {!publicView && (
+            <div className="manager-toolbar" aria-label="Navigasi pengelola">
+              <Button
+                type="button"
+                variant={dataPanelOpen ? "secondary" : "ghost"}
+                size="icon-sm"
+                title="Daftar lokasi"
+                aria-expanded={dataPanelOpen}
+                onClick={() => setDataPanelOpen((open) => !open)}
+              >
+                <LayoutGrid size={17} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Wilayah SLS"
+                onClick={() => setModal("regions")}
+              >
+                <Layers size={17} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Panduan"
+                onClick={() => setModal("help")}
+              >
+                <HelpCircle size={17} />
+              </Button>
+            </div>
+          )}
           {publicView && (
             <div
               className={
@@ -455,7 +533,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             >
               <div className="search-field">
                 <Search size={18} />
-                <input
+                <Input
                   aria-label="Cari lokasi atau alamat"
                   placeholder="Cari nama lokasi atau alamat…"
                   value={query}
@@ -465,16 +543,22 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                   }}
                 />
                 {query && (
-                  <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
                     aria-label="Hapus pencarian"
                     onClick={() => setQuery("")}
                   >
                     <X size={15} />
-                  </button>
+                  </Button>
                 )}
                 <kbd>/</kbd>
               </div>
-              <button
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
                 className="public-filter-toggle"
                 aria-label="Buka filter SLS"
                 aria-expanded={publicFiltersOpen}
@@ -482,8 +566,11 @@ export default function Explorer({ locationId }: { locationId?: string }) {
               >
                 <SlidersHorizontal size={16} />
                 <span>Filter</span>
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
                 className="public-data-toggle"
                 aria-label="Buka daftar lokasi"
                 title="Daftar lokasi"
@@ -492,7 +579,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
               >
                 <LayoutGrid size={15} />
                 {dataPanelOpen ? "Tutup data" : `Data (${total})`}
-              </button>
+              </Button>
               <label
                 className={
                   "select-field public-sls-filter " +
@@ -522,14 +609,16 @@ export default function Explorer({ locationId }: { locationId?: string }) {
               Akses publik
             </span>
             <span className="top-divider" />
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               className="login-button"
               onClick={() => setModal(user ? "manage" : "login")}
             >
               {user ? <Users size={16} /> : <LogIn size={16} />}
               <span>{user ? user.name : "Masuk Pengelola"}</span>
               <ArrowUpRight size={15} />
-            </button>
+            </Button>
           </div>
         </header>
         <main>
@@ -548,17 +637,14 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             </div>
             <button
               className="area-chip"
-              onClick={() => {
-                setCenter([-6.184, 106.837]);
-                setReset((v) => v + 1);
-              }}
+              onClick={() => changeFilter(filter)}
             >
               <span className="area-icon">
                 <MapPin size={19} />
               </span>
               <span>
                 <small>WILAYAH PEMETAAN</small>
-                <strong>Menteng, Jakarta Pusat</strong>
+                <strong>{mappingName}</strong>
               </span>
               <ChevronDown size={16} />
             </button>
@@ -632,30 +718,6 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             </div>
           </section>
           <section className="explore-section">
-            {!publicView && (
-              <div className="explore-heading">
-                <div>
-                  <h2>Peta persebaran lokasi</h2>
-                  <span>Setiap titik, bagian dari cerita wilayah kita.</span>
-                </div>
-                <div className="view-toggle">
-                  <button
-                    className={!listView ? "selected" : ""}
-                    onClick={() => setListView(false)}
-                  >
-                    <MapIcon size={15} />
-                    Peta
-                  </button>
-                  <button
-                    className={listView ? "selected" : ""}
-                    onClick={() => setListView(true)}
-                  >
-                    <LayoutGrid size={15} />
-                    Daftar
-                  </button>
-                </div>
-              </div>
-            )}
             {!publicView && <div className="filterbar">
               <div className="search-field">
                 <Search size={18} />
@@ -748,14 +810,13 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             <div
               className={
                 "map-workspace " +
-                (!publicView && listView ? "list-mode " : "") +
-                (publicView && dataPanelOpen ? "public-list-open" : "")
+                (dataPanelOpen ? "list-open public-list-open" : "")
               }
             >
               <aside
                 className="location-panel"
-                aria-hidden={publicView && !dataPanelOpen}
-                inert={publicView && !dataPanelOpen}
+                aria-hidden={!dataPanelOpen}
+                inert={!dataPanelOpen}
               >
                 <div className="list-heading">
                   <div>
@@ -763,29 +824,21 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                       Daftar lokasi <span>{total}</span>
                     </h3>
                     <p>
-                      {filter
-                        ? sls.find((s) => s.id === filter)?.name
-                        : "Semua wilayah SLS"}{" "}
-                      · Kecamatan Menteng
+                      {mappingName} · {mappingDetail}
                     </p>
                   </div>
                   {loading ? (
                     <LoaderCircle size={17} className="spin" />
                   ) : (
-                    <button
-                      title={
-                        publicView
-                          ? "Tutup daftar lokasi"
-                          : "Tampilkan semua titik"
-                      }
-                      onClick={() =>
-                        publicView
-                          ? setDataPanelOpen(false)
-                          : setReset((v) => v + 1)
-                      }
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Tutup daftar lokasi"
+                      onClick={() => setDataPanelOpen(false)}
                     >
                       <PanelLeftClose size={17} />
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <div className="location-list">
@@ -913,20 +966,30 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                   center={center}
                   userLocation={userLocation}
                   resetKey={reset}
+                  fitPoints={fitPoints}
                   boundaries={boundary}
                 />
                 <div className="map-location-chip">
                   <span className="live-dot" />
-                  <span>Menteng, Jakarta Pusat</span>
+                  <span>{mappingName}</span>
                   <span className="chip-divider" />
                   <strong>{visible.length} lokasi</strong>
                 </div>
                 <div className="map-extra-controls">
-                  <button title="Lokasi saya" onClick={doLocate}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Lokasi saya"
+                    onClick={doLocate}
+                  >
                     <LocateFixed size={19} />
-                  </button>
+                  </Button>
                   {publicView && (
-                    <button
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
                       title={
                         boundary
                           ? "Sembunyikan poligon SLS"
@@ -942,23 +1005,29 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                       onClick={() => setBoundary((value) => !value)}
                     >
                       <Layers size={18} />
-                    </button>
+                    </Button>
                   )}
                   {user && (
                     <>
-                      <button
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
                         title="Sesuaikan tampilan peta"
                         onClick={() => setReset((v) => v + 1)}
                       >
                         <Maximize size={18} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
                         title="Lapisan peta"
                         className={layers ? "control-active" : ""}
                         onClick={() => setLayers((v) => !v)}
                       >
                         <Layers size={18} />
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
@@ -979,14 +1048,17 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                 <div className="map-legend">
                   <span>WILAYAH SLS</span>
                   {sls.map((s) => (
-                    <button
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
                       key={s.id}
                       onClick={() => changeFilter(filter === s.id ? "" : s.id)}
                       className={filter === s.id ? "legend-active" : ""}
                     >
                       <i style={{ background: s.marker_color }} />
                       {s.code}
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <div className="map-hint">
@@ -998,7 +1070,8 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                 <section className="detail-panel">
                   <div className="detail-top">
                     <span>DETAIL LOKASI</span>
-                    <button
+                    <Button
+                      type="button"
                       title="Tutup detail"
                       onClick={() => {
                         if (locationId) router.push("/");
@@ -1006,7 +1079,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                       }}
                     >
                       <X size={19} />
-                    </button>
+                    </Button>
                   </div>
                   {selected.image_url ? (
                     <Image
@@ -1090,9 +1163,14 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                         Buka halaman detail
                       </Link>
                       {user && (
-                        <button onClick={() => setModal("edit-selected")}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setModal("edit-selected")}
+                        >
                           Edit lokasi
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <div className="comments-section">
@@ -1134,7 +1212,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                       <form onSubmit={comment}>
                         <label>
                           Nama
-                          <input
+                          <Input
                             name="name"
                             placeholder="Nama Anda"
                             required
@@ -1144,7 +1222,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                         </label>
                         <label>
                           Komentar
-                          <textarea
+                          <Textarea
                             name="comment"
                             placeholder="Tulis informasi tentang lokasi ini…"
                             required
@@ -1152,10 +1230,10 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                             maxLength={2000}
                           />
                         </label>
-                        <button className="secondary full" disabled={busy}>
+                        <Button className="secondary full" disabled={busy}>
                           Kirim komentar
                           <ArrowRight size={15} />
-                        </button>
+                        </Button>
                         <small>
                           Komentar langsung tampil setelah dikirim.
                         </small>
@@ -1204,13 +1282,16 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             aria-label="Dialog Geovit"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
               className="modal-close"
               aria-label="Tutup dialog"
               onClick={() => setModal("")}
             >
               <X size={21} />
-            </button>
+            </Button>
             {modal === "login" && (
               <>
                 <span className="modal-icon">
@@ -1256,7 +1337,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                 >
                   <label>
                     Email
-                    <input
+                    <Input
                       type="email"
                       name="email"
                       placeholder="nama@instansi.go.id"
@@ -1265,20 +1346,20 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                   </label>
                   <label>
                     Kata sandi
-                    <input
+                    <Input
                       type="password"
                       name="password"
                       placeholder="Masukkan kata sandi"
                       required
                     />
                   </label>
-                  <button
+                  <Button
                     disabled={busy || dataMode !== "database"}
                     className="primary full"
                   >
                     {busy ? "Memproses…" : "Masuk Pengelola"}
                     <ArrowRight size={17} />
-                  </button>
+                  </Button>
                 </form>
                 <div className="login-footer">
                   <Globe size={14} />
@@ -1323,15 +1404,15 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                       <h3>Bagikan perkembangan</h3>
                       <p>
                         Catat kunjungan dan tulis komentar tanpa login. Komentar
-                        ditinjau editor sebelum tampil.
+                        langsung tampil di halaman publik.
                       </p>
                     </section>
                   </div>
                 </div>
-                <button className="primary full" onClick={() => setModal("")}>
+                <Button className="primary full" onClick={() => setModal("")}>
                   Mulai jelajahi
                   <ArrowRight size={17} />
-                </button>
+                </Button>
               </>
             )}
             {modal === "regions" && (
@@ -1369,6 +1450,7 @@ export default function Explorer({ locationId }: { locationId?: string }) {
             {["edit", "edit-selected", "manage", "import"].includes(modal) &&
               user && (
                 <Manager
+                  key={modal + (selected?.id || "")}
                   mode={modal}
                   user={user}
                   sls={sls}
@@ -1382,6 +1464,12 @@ export default function Explorer({ locationId }: { locationId?: string }) {
                     refresh();
                   }}
                   onRefresh={refresh}
+                  onCreated={(saved) => {
+                    applyLocationCreated(saved);
+                    setModal("");
+                    if (locationId) router.push("/");
+                  }}
+                  onSlsChange={applySlsChange}
                   onSignOut={() =>
                     signOut({ redirect: false }).then(() => {
                       setUser(null);
@@ -1407,11 +1495,11 @@ function LocationListSkeleton() {
     >
       {Array.from({ length: 5 }, (_, index) => (
         <div className="location-skeleton" key={index}>
-          <span className="skeleton skeleton-icon" />
+          <Skeleton className="skeleton skeleton-icon" />
           <div>
-            <span className="skeleton skeleton-line skeleton-title" />
-            <span className="skeleton skeleton-line skeleton-address" />
-            <span className="skeleton skeleton-line skeleton-tag" />
+            <Skeleton className="skeleton skeleton-line skeleton-title" />
+            <Skeleton className="skeleton skeleton-line skeleton-address" />
+            <Skeleton className="skeleton skeleton-line skeleton-tag" />
           </div>
         </div>
       ))}
@@ -1428,9 +1516,9 @@ function CommentListSkeleton() {
     >
       {Array.from({ length: 2 }, (_, index) => (
         <div className="comment-skeleton" key={index}>
-          <span className="skeleton skeleton-line skeleton-comment-name" />
-          <span className="skeleton skeleton-line skeleton-comment-text" />
-          <span className="skeleton skeleton-line skeleton-comment-text short" />
+          <Skeleton className="skeleton skeleton-line skeleton-comment-name" />
+          <Skeleton className="skeleton skeleton-line skeleton-comment-text" />
+          <Skeleton className="skeleton skeleton-line skeleton-comment-text short" />
         </div>
       ))}
     </div>

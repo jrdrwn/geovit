@@ -239,6 +239,54 @@ test(
           );
         },
       );
+      await t.test(
+        "new SLS returns an ID that is immediately usable for a location",
+        async () => {
+          const response = await post(
+            {
+              action: "sls",
+              data: {
+                code: "SLS-NEW-" + suffix,
+                name: "SLS baru",
+                marker_color: "#238c6d",
+                is_active: true,
+                boundary: [
+                  [-6.2, 106.8],
+                  [-6.201, 106.801],
+                  [-6.202, 106.8],
+                ],
+              },
+            },
+            adminCookie,
+          );
+          assert.equal(response.status, 200);
+          const created = await response.json();
+          assert.equal(created.sls.name, "SLS baru");
+          assert.ok(created.sls.id);
+          assert.equal(
+            (
+              await post(
+                {
+                  action: "location",
+                  data: {
+                    title: "Lokasi pada SLS baru",
+                    sls_id: created.sls.id,
+                    latitude: -6.201,
+                    longitude: 106.8,
+                  },
+                },
+                editorCookie,
+              )
+            ).status,
+            200,
+          );
+          assert.equal(
+            (await post({ action: "delete-sls", id: created.sls.id }, adminCookie))
+              .status,
+            200,
+          );
+        },
+      );
       await t.test("upload authentication and file validation", async () => {
         assert.equal(
           (await fetch(base + "/api/upload", { method: "POST" })).status,

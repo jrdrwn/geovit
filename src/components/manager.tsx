@@ -1,22 +1,27 @@
 "use client";
-import { useState, useEffect, useMemo, useRef } from "react";
-import {
-  Plus,
-  Upload,
-  LogOut,
-  MapPin,
-  LocateFixed,
-  Check,
-  Trash2,
-  FileSpreadsheet,
-  Info,
-  LoaderCircle,
-} from "lucide-react";
-import Map from "./map";
-import Image from "next/image";
-import { api, User } from "./explorer";
-import { Location, SLS, Comment } from "@/lib/data";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Comment, Location, SLS } from "@/lib/data";
 import { locationInput } from "@/lib/validation";
+import {
+    Check,
+    FileSpreadsheet,
+    Info,
+    LoaderCircle,
+    LocateFixed,
+    LogOut,
+    MapPin,
+    Plus,
+    Trash2,
+    Upload,
+} from "lucide-react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { api, User } from "./explorer";
+import Map from "./map";
 const empty = {
   title: "",
   sls_id: "",
@@ -37,6 +42,8 @@ export default function Manager({
   onDone,
   onRefresh,
   onSignOut,
+  onCreated,
+  onSlsChange,
 }: {
   mode: string;
   user: User;
@@ -47,6 +54,8 @@ export default function Manager({
   onDone: () => void;
   onRefresh: () => void;
   onSignOut: () => void;
+  onCreated: (location: Location) => void;
+  onSlsChange: (region: SLS) => void;
 }) {
   const [tab, setTab] = useState(mode === "manage" ? "comments" : "location"),
     [form, setForm] = useState<typeof empty & Partial<Location>>({
@@ -71,7 +80,11 @@ export default function Manager({
     [slsToDelete, setSlsToDelete] = useState<SLS | null>(null),
     [locationToDelete, setLocationToDelete] = useState<Location | null>(null),
     [locationSearch, setLocationSearch] = useState(""),
-    [managementLoading, setManagementLoading] = useState(mode === "manage");
+    [managementLoading, setManagementLoading] = useState(mode === "manage"),
+    [sessionSls, setSessionSls] = useState<SLS[]>([]),
+    [slsUserLocation, setSlsUserLocation] = useState<
+      [number, number] | null
+    >(null);
   const [polygon, setPolygon] = useState<[number, number][]>(
     slsEdit?.boundary || [],
   );
@@ -180,12 +193,101 @@ export default function Manager({
       `${item.title} ${item.address}`.toLowerCase().includes(needle),
     );
   }, [managedLocations, locationSearch]);
+  const availableSls = useMemo(() => {
+    const next = new globalThis.Map(sls.map((region) => [region.id, region]));
+    for (const region of sessionSls) next.set(region.id, region);
+    return [...next.values()];
+  }, [sls, sessionSls]);
   function startNewLocation() {
-    setForm({ ...empty, sls_id: sls[0]?.id || "" });
+    setForm({ ...empty, sls_id: availableSls[0]?.id || "" });
     setPicking(false);
     setLocationAccuracy(null);
     setConfirmDelete(false);
     setTab("location");
+  }
+  function handleSlsCurrentLocation() {
+    if (locating || busy) return;
+    if (!window.isSecureContext || !navigator.geolocation) {
+      notify("Lokasi perangkat memerlukan HTTPS atau localhost.");
+      return;
+    }
+    const request = ++locationRequest.current;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        if (request !== locationRequest.current) return;
+        const position: [number, number] = [
+          Number(coords.latitude.toFixed(6)),
+          Number(coords.longitude.toFixed(6)),
+        ];
+        setSlsUserLocation(position);
+        setLocating(false);
+        notify("Peta SLS dipusatkan ke lokasi Anda. Tambahkan titik batas di sekitarnya.");
+      },
+      () => {
+        if (request !== locationRequest.current) return;
+        setLocating(false);
+        notify("Lokasi belum tersedia. Izinkan akses lokasi lalu coba lagi.");
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  }
+  async function saveSls(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setBusy(true);
+    try {
+      const result = await api({
+        action: "sls",
+        data: {
+          id: slsEdit?.id,
+          code: data.get("code"),
+          name: data.get("name"),
+          description: data.get("description"),
+          marker_color: data.get("marker_color"),
+          is_active: data.get("active") === "on",
+          boundary: polygon,
+        },
+      });
+      const saved = result.sls as SLS;
+      setSessionSls((current) => [
+        ...current.filter((region) => region.id !== saved.id),
+        saved,
+      ]);
+      setSlsEdit(saved);
+      setPolygon(saved.boundary || []);
+      onSlsChange(saved);
+      onRefresh();
+      if (!slsEdit) {
+        setForm({ ...empty, sls_id: saved.id });
+        setTab("location");
+        notify("SLS dibuat. Sekarang tambahkan lokasi pada wilayah ini.");
+      } else notify("Wilayah SLS diperbarui.");
+    } catch (error) {
+      notify((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveLocation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (locating || busy) return;
+    if (!coordinatesValid) {
+      notify("Koordinat tidak valid.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api({ action: "location", data: form });
+      onCreated(result.location as Location);
+      notify("Lokasi berhasil disimpan.");
+      return true;
+    } catch (error) {
+      notify((error as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
   async function perform(body: unknown, message: string, close = false) {
     setBusy(true);
@@ -252,7 +354,7 @@ export default function Manager({
         throw Error("File harus berisi 1 sampai 1.000 baris.");
       setRows(
         records.map((r, i) => {
-          const region = sls.find(
+          const region = availableSls.find(
             (s) => s.code === String(r.kode_sls).trim() && s.is_active,
           );
           const data = {
@@ -300,19 +402,22 @@ export default function Manager({
       </h2>
       <p>Data yang rapi membantu pendataan yang lebih baik.</p>
       {mode === "manage" && (
-        <div className="manager-tabs">
+        <Tabs
+          value={tab}
+          onValueChange={(next) =>
+            next === "location" ? startNewLocation() : setTab(next)
+          }
+        >
+          <TabsList className="manager-tabs" variant="line">
           {[
             "comments",
             "locations",
             "location",
             ...(user.role === "admin" ? ["sls", "import", "users"] : []),
           ].map((t) => (
-            <button
-              className={tab === t ? "active" : ""}
+            <TabsTrigger
               key={t}
-              onClick={() =>
-                t === "location" ? startNewLocation() : setTab(t)
-              }
+              value={t}
             >
               {
                 {
@@ -324,12 +429,19 @@ export default function Manager({
                   users: "Pengguna",
                 }[t]
               }
-            </button>
+            </TabsTrigger>
           ))}
-          <button title="Keluar akun" onClick={onSignOut}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            title="Keluar akun"
+            onClick={onSignOut}
+          >
             <LogOut size={15} />
-          </button>
-        </div>
+          </Button>
+          </TabsList>
+        </Tabs>
       )}
       {(slsToDelete || locationToDelete) && (
         <div className="manager-confirm" role="alertdialog" aria-modal="true">
@@ -400,11 +512,11 @@ export default function Manager({
               <h3>Manajemen lokasi</h3>
               <p>{managedLocations.length} lokasi tersedia untuk dikelola.</p>
             </div>
-            <button type="button" onClick={startNewLocation}>
+            <Button type="button" variant="outline" size="sm" onClick={startNewLocation}>
               <Plus size={15} /> Tambah
-            </button>
+            </Button>
           </div>
-          <input
+          <Input
             className="management-search"
             aria-label="Cari lokasi untuk dikelola"
             placeholder="Cari nama atau alamat lokasi…"
@@ -419,7 +531,7 @@ export default function Manager({
               <ManagerListSkeleton />
             ) : (
               visibleManagedLocations.map((item) => {
-                const region = sls.find((s) => s.id === item.sls_id);
+                const region = availableSls.find((s) => s.id === item.sls_id);
                 return (
                   <article key={item.id}>
                     <div>
@@ -459,25 +571,11 @@ export default function Manager({
         </section>
       )}
       {tab === "location" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (locating) return;
-            if (!coordinatesValid) {
-              notify("Koordinat tidak valid.");
-              return;
-            }
-            perform(
-              { action: "location", data: form },
-              "Lokasi berhasil disimpan.",
-              true,
-            );
-          }}
-        >
+        <form onSubmit={saveLocation}>
           <div className="form-grid">
             <label>
               Judul lokasi
-              <input
+              <Input
                 required
                 minLength={2}
                 maxLength={160}
@@ -493,7 +591,7 @@ export default function Manager({
                 required
                 onChange={(e) => setForm({ ...form, sls_id: e.target.value })}
               >
-                {sls
+                {availableSls
                   .filter((s) => s.is_active)
                   .map((s) => (
                     <option key={s.id} value={s.id}>
@@ -505,7 +603,7 @@ export default function Manager({
           </div>
           <label>
             Alamat
-            <input
+            <Input
               value={form.address}
               maxLength={500}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
@@ -514,7 +612,7 @@ export default function Manager({
           </label>
           <label>
             Deskripsi
-            <textarea
+            <Textarea
               value={form.description}
               maxLength={3000}
               onChange={(e) =>
@@ -525,7 +623,7 @@ export default function Manager({
           <div className="form-grid">
             <label>
               Latitude
-              <input
+              <Input
                 required
                 type="number"
                 min={-90}
@@ -543,7 +641,7 @@ export default function Manager({
             </label>
             <label>
               Longitude
-              <input
+              <Input
                 required
                 type="number"
                 min={-180}
@@ -597,7 +695,7 @@ export default function Manager({
           <div className="editor-map">
             <Map
               markers={markers}
-              sls={sls}
+              sls={availableSls}
               center={coordinatesValid ? center : undefined}
               onMapClick={
                 picking
@@ -668,14 +766,14 @@ export default function Manager({
                 Hapus lokasi
               </button>
             )}
-            <button className="primary" disabled={busy || locating}>
+            <Button className="primary" disabled={busy || locating}>
               {busy ? (
                 <LoaderCircle className="spin" size={16} />
               ) : (
                 <Check size={16} />
               )}
               Simpan lokasi
-            </button>
+            </Button>
           </div>
           {confirmDelete && (
             <div className="info-box">
@@ -759,7 +857,7 @@ export default function Manager({
       {tab === "sls" && (
         <>
           <div className="region-list">
-            {sls.map((s) => (
+            {availableSls.map((s) => (
               <div className="region-edit-row" key={s.id}>
                 <span
                   className="region-dot"
@@ -773,6 +871,7 @@ export default function Manager({
                   onClick={() => {
                     setSlsEdit(s);
                     setPolygon(s.boundary || []);
+                    setSlsUserLocation(null);
                   }}
                 >
                   Edit
@@ -790,26 +889,7 @@ export default function Manager({
           <h3>{slsEdit ? "Edit wilayah" : "Tambah wilayah"}</h3>
           <form
             key={slsEdit?.id || "new"}
-            onSubmit={(e) => {
-              e.preventDefault();
-              const data = new FormData(e.currentTarget);
-              perform(
-                {
-                  action: "sls",
-                  data: {
-                    id: slsEdit?.id,
-                    code: data.get("code"),
-                    name: data.get("name"),
-                    description: data.get("description"),
-                    marker_color: data.get("marker_color"),
-                    is_active: data.get("active") === "on",
-                    boundary: polygon,
-                  },
-                },
-                "Wilayah SLS disimpan.",
-                true,
-              );
-            }}
+            onSubmit={saveSls}
           >
             <div className="form-grid">
               <label>
@@ -817,7 +897,7 @@ export default function Manager({
                 <input
                   name="code"
                   required
-                  pattern="SLS-[A-Za-z0-9-]+"
+                  pattern="SLS-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*"
                   placeholder="SLS-005"
                   defaultValue={slsEdit?.code}
                 />
@@ -870,11 +950,31 @@ export default function Manager({
                 Hapus poligon
               </button>
             </div>
+            <div className="coordinate-actions sls-location-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={locating || busy}
+                onClick={handleSlsCurrentLocation}
+                aria-busy={locating}
+              >
+                {locating ? (
+                  <LoaderCircle size={16} className="spin" />
+                ) : (
+                  <LocateFixed size={16} />
+                )}
+                {locating ? "Mencari lokasi…" : "Lokasi saat ini"}
+              </button>
+              <span>
+                Peta dipusatkan ke posisi Anda; klik peta untuk menggambar batas.
+              </span>
+            </div>
             <div className="polygon-editor-map">
               <Map
                 markers={[]}
-                sls={sls}
-                center={polygon[0] || [-6.184, 106.837]}
+                sls={availableSls}
+                center={slsUserLocation || polygon[0] || [-6.184, 106.837]}
+                userLocation={slsUserLocation}
                 polygon={polygon}
                 polygonEditable
                 onPolygonChange={setPolygon}
@@ -1095,8 +1195,8 @@ function ManagerListSkeleton() {
     <div className="manager-skeleton-list" aria-label="Memuat lokasi">
       {Array.from({ length: 5 }, (_, index) => (
         <div className="manager-skeleton-row" key={index}>
-          <span className="skeleton skeleton-line manager-skeleton-title" />
-          <span className="skeleton skeleton-line manager-skeleton-detail" />
+          <Skeleton className="skeleton skeleton-line manager-skeleton-title" />
+          <Skeleton className="skeleton skeleton-line manager-skeleton-detail" />
         </div>
       ))}
     </div>
@@ -1108,9 +1208,9 @@ function ManagerCommentSkeleton() {
     <div className="manager-skeleton-list" aria-label="Memuat komentar">
       {Array.from({ length: 3 }, (_, index) => (
         <div className="manager-skeleton-row" key={index}>
-          <span className="skeleton skeleton-line manager-skeleton-title" />
-          <span className="skeleton skeleton-line manager-skeleton-comment" />
-          <span className="skeleton skeleton-line manager-skeleton-detail" />
+          <Skeleton className="skeleton skeleton-line manager-skeleton-title" />
+          <Skeleton className="skeleton skeleton-line manager-skeleton-comment" />
+          <Skeleton className="skeleton skeleton-line manager-skeleton-detail" />
         </div>
       ))}
     </div>

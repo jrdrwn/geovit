@@ -1,18 +1,17 @@
 "use client";
-import { useEffect } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  useMap,
-  useMapEvents,
-  Polygon,
-} from "react-leaflet";
 import L from "leaflet";
 import "leaflet.markercluster";
-import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
-import type { MapProps } from "./map";
-import type { PolygonPoint } from "./map";
+import "leaflet/dist/leaflet.css";
+import { useEffect } from "react";
+import {
+    MapContainer,
+    Polygon,
+    TileLayer,
+    useMap,
+    useMapEvents,
+} from "react-leaflet";
+import type { MapProps, PolygonPoint } from "./map";
 function Content({
   markers,
   sls,
@@ -26,6 +25,7 @@ function Content({
   polygonEditable,
   onPolygonChange,
   resetKey,
+  fitPoints,
 }: MapProps) {
   const map = useMap();
   useEffect(() => {
@@ -147,17 +147,17 @@ function Content({
     };
   }, [polygon, polygonEditable, onPolygonChange, map]);
   useEffect(() => {
-    if (resetKey)
-      map.fitBounds(
-        markers.length
-          ? L.latLngBounds(markers.map((m) => [m.latitude, m.longitude]))
-          : [
-              [-6.2, 106.82],
-              [-6.17, 106.85],
-            ],
-        { padding: [55, 55] },
-      );
-  }, [resetKey, map, markers]);
+    if (!resetKey) return;
+    const bounds = fitPoints?.length
+      ? L.latLngBounds(fitPoints)
+      : markers.length
+        ? L.latLngBounds(markers.map((m) => [m.latitude, m.longitude]))
+        : ([
+            [-6.2, 106.82],
+            [-6.17, 106.85],
+          ] as [number, number][]);
+    map.fitBounds(bounds, { padding: [55, 55] });
+  }, [resetKey, map, markers, fitPoints]);
   useEffect(() => {
     const control = L.control.zoom({ position: "topright" });
     control.addTo(map);

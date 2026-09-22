@@ -1,6 +1,6 @@
 # Geovit — Pemetaan Sensus
 
-Aplikasi Next.js/TypeScript untuk lokasi sensus berbasis SLS. Menggunakan Leaflet + OpenStreetMap, PostgreSQL + Drizzle, Auth.js Credentials, dan ImageKit. Tidak menggunakan API Google Maps, geocoding, atau layanan rute.
+Aplikasi Next.js/TypeScript untuk lokasi sensus berbasis SLS. Menggunakan shadcn/ui + Radix, Leaflet + OpenStreetMap, PostgreSQL + Drizzle, Auth.js Credentials, dan ImageKit. Tidak menggunakan API Google Maps, geocoding, atau layanan rute.
 
 ## Menjalankan lokal
 
@@ -91,6 +91,7 @@ Tile OSM menggunakan URL resmi, attribution terlihat, cache browser standar, tan
 - `src/components/map.tsx`: API map bebas provider; implementasi Leaflet dimuat lazy melalui `map-leaflet.tsx`.
 - `src/components/explorer.tsx`: pencarian, peta publik, detail, komentar, login.
 - `src/components/manager.tsx`: form editor, SLS, import, moderasi, pengguna.
+- `src/components/ui/`: primitives shadcn/ui yang dapat dipakai ulang, dengan konfigurasi di `components.json`.
 - `src/app/api/data/route.ts`: query publik dan mutasi tervalidasi dengan otorisasi.
 - `src/app/api/upload/route.ts`: upload foto ke ImageKit, setelah autentikasi dan validasi file.
 - `src/auth.ts`: Auth.js, bcrypt, sesi JWT dan otorisasi DB.

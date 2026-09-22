@@ -1,26 +1,93 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 :root {
-  --background: #f7f9f8;
-  --foreground: #263d36;
   --green: #21846a;
-  --muted: #8a9792;
+  --muted: #f0f4ef;
   --line: #e8edea;
   --font-sans: var(--font-geist-sans);
+  --background: #f7f9f8;
+  --foreground: #263d36;
+  --card: #ffffff;
+  --card-foreground: #263d36;
+  --popover: #ffffff;
+  --popover-foreground: #263d36;
+  --primary: #21846a;
+  --primary-foreground: #ffffff;
+  --secondary: #eff7f1;
+  --secondary-foreground: #365d4b;
+  --muted-foreground: #77877e;
+  --accent: #eaf5ed;
+  --accent-foreground: #285c47;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e1e8e2;
+  --input: #dfe7da;
+  --ring: #68baa4;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
   font-family: var(--font-geist-sans), Arial, sans-serif;
   font-size: 13px;
 }
@@ -174,6 +241,9 @@ svg {
 .workspace {
   margin-left: 76px;
 }
+.manager-view .workspace {
+  margin-left: 0;
+}
 .topbar {
   height: 77px;
   padding: 0 34px;
@@ -206,6 +276,17 @@ svg {
   display: flex;
   align-items: center;
   gap: 23px;
+}
+.manager-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 16px;
+  padding: 3px;
+  border: 1px solid #e2e9e3;
+  border-radius: 9px;
+  background: #f8fbf8;
 }
 .public-label {
   display: flex;
@@ -2048,6 +2129,11 @@ th {
   .brand-symbol {
     width: 34px;
     height: 36px;
+    border-radius: 10px;
+    margin: 20px 0 29px;
+  }
+  .brand-symbol svg {
+    width: 22px;
   }
   .rail-button {
     width: 38px;
@@ -2113,190 +2199,6 @@ th {
     font-size: 24px;
     flex-direction: column;
     gap: 6px;
-  }
-  .stat > div > span {
-    font-size: 9px;
-  }
-  .stat strong small {
-    font-size: 8px;
-  }
-  .explore-heading {
-    padding: 17px;
-  }
-  .filterbar {
-    padding: 0 16px 15px;
-    gap: 7px;
-  }
-  .select-field {
-    padding: 0 8px;
-    gap: 6px;
-  }
-  .select-field select {
-    max-width: 99px;
-    font-size: 9px;
-  }
-  .status-select > svg:first-child {
-    display: none;
-  }
-  .search-field {
-    min-width: 135px;
-    padding: 0 9px;
-  }
-  .search-field input {
-    font-size: 10px;
-  }
-  .search-field kbd {
-    display: none;
-  }
-  .location-panel {
-    width: 260px;
-    min-width: 260px;
-  }
-  .location-card-bottom {
-    padding-left: 0;
-  }
-  .location-title strong {
-    font-size: 10px;
-  }
-  .location-title > span {
-    font-size: 8px;
-  }
-  .house-icon {
-    min-width: 30px;
-    width: 30px;
-    height: 34px;
-  }
-  .map-location-chip {
-    left: 12px;
-    font-size: 8px;
-    padding: 9px;
-    gap: 7px;
-  }
-  .map-location-chip strong,
-  .chip-divider {
-    display: none;
-  }
-  .map-legend {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .map-hint {
-    display: none;
-  }
-  .page-footer {
-    font-size: 8px;
-  }
-  .page-footer > span:first-child {
-    display: none;
-  }
-  .page-footer > span:last-child {
-    margin-left: auto;
-  }
-}
-@media (max-width: 640px) {
-  .rail {
-    width: 52px;
-  }
-  .brand-symbol {
-    width: 31px;
-    height: 33px;
-    border-radius: 10px;
-    margin: 20px 0 29px;
-  }
-  .brand-symbol svg {
-    width: 22px;
-  }
-  .rail-button {
-    width: 34px;
-    height: 39px;
-  }
-  .rail-button svg {
-    width: 19px;
-  }
-  .rail-button.active:before {
-    left: -9px;
-  }
-  .rail-nav {
-    gap: 12px;
-  }
-  .workspace {
-    margin-left: 52px;
-  }
-  .topbar {
-    height: 70px;
-    padding: 0 17px;
-  }
-  .wordmark {
-    font-size: 25px;
-    gap: 10px;
-  }
-  .wordmark > span,
-  .wordmark small {
-    display: none;
-  }
-  .login-button {
-    font-size: 10px;
-    gap: 6px;
-  }
-  .login-button > svg:last-child {
-    display: none;
-  }
-  .login-button > svg:first-child {
-    width: 14px;
-  }
-  .header-right {
-    gap: 0;
-  }
-  main {
-    padding: 22px 13px 0;
-  }
-  .page-intro {
-    margin-bottom: 21px;
-    display: block;
-  }
-  .eyebrow {
-    font-size: 7px;
-    letter-spacing: 1.2px;
-    margin-bottom: 9px;
-  }
-  h1 {
-    font-size: 26px;
-    max-width: 250px;
-    line-height: 1.23;
-    letter-spacing: -0.9px;
-  }
-  .page-intro p {
-    font-size: 10px;
-    line-height: 1.8;
-    margin-top: 10px;
-    max-width: 270px;
-  }
-  .area-chip {
-    display: none;
-  }
-  .stats-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 9px;
-    margin-bottom: 22px;
-  }
-  .stat {
-    padding: 13px 11px;
-    gap: 9px;
-  }
-  .stat-icon {
-    display: flex;
-    min-width: 29px;
-    width: 29px;
-    height: 32px;
-    border-radius: 7px;
-  }
-  .stat-icon svg {
-    width: 16px;
-  }
-  .stat strong {
-    font-size: 21px;
-    display: block;
   }
   .stat strong small {
     display: block;
@@ -2588,23 +2490,16 @@ th {
   min-width: 300px;
 }
 .public-view .page-footer {
-  justify-content: flex-end;
+  display: none;
 }
-.public-data-toggle {
-  border: 1px solid #d8e5dc;
-  background: #f6faf7;
-  color: #39765c;
-  border-radius: 7px;
-  padding: 8px 11px;
-  font-size: 10px;
+
+/* Ruang pengelola: daftar lokasi menjadi laci overlay sehingga peta penuh. */
+.manager-view .map-workspace {
+  height: calc(100vh - 322px);
+  min-height: 480px;
+  max-height: none;
 }
-.public-view .map-workspace {
-  position: relative;
-}
-.public-view .map-panel {
-  width: 100%;
-}
-.public-view .location-panel {
+.manager-view .location-panel {
   position: absolute;
   z-index: 700;
   top: 0;
@@ -2613,62 +2508,28 @@ th {
   width: min(340px, calc(100% - 28px));
   min-width: 0;
   height: auto;
+  border: 1px solid #dfe5df;
+  border-radius: 10px;
+  background: #fff;
   box-shadow: 12px 0 28px #183c2c26;
   transform: translateX(calc(-100% - 12px));
   transition: transform 0.22s ease;
 }
-.public-view .map-workspace.public-list-open .location-panel {
+.manager-view .map-workspace.list-open .location-panel {
   transform: translateX(0);
 }
-
 @media (max-width: 640px) {
-  .public-view main {
-    padding: 12px 10px 0;
+  .manager-view .map-workspace {
+    height: calc(100dvh - 210px);
+    min-height: 380px;
   }
-  .public-view .topbar {
-    height: 60px;
-  }
-  .public-view .map-workspace {
-    height: auto;
-    min-height: 0;
-  }
-  .public-view .map-panel {
-    height: 440px;
-    min-height: 440px;
-  }
-  .public-view .location-panel {
-    height: auto;
-  }
-  .public-view .filterbar {
-    padding: 0 10px 11px;
-  }
-  .public-view .search-field {
-    flex-basis: 100%;
-  }
-  .public-view .select-field {
-    flex: 1 1 0;
-  }
-  .public-view .location-card {
-    padding-top: 13px;
-    padding-bottom: 13px;
+  .manager-view .location-panel {
+    top: 10px;
+    bottom: 10px;
+    left: 9px;
   }
 }
-.not-found {
-  display: flex;
-  min-height: 85vh;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  text-align: center;
-}
-.not-found > svg {
-  color: #27876a;
-}
-.not-found p {
-  color: #899b88;
-  font-size: 12px;
-}
+
 @media (max-width: 640px) {
   .filterbar .select-field {
     min-width: 0;
@@ -2691,6 +2552,15 @@ th {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+.sls-location-actions {
+  align-items: center;
+  margin-top: 12px;
+}
+.sls-location-actions > span {
+  color: #83927d;
+  font-size: 9px;
+  line-height: 1.5;
 }
 .coordinate-help {
   margin-top: 10px;
@@ -2846,6 +2716,21 @@ th {
 }
 
 @media (max-width: 640px) {
+  .manager-view .topbar {
+    padding: 0 12px;
+  }
+  .manager-view .wordmark {
+    gap: 0;
+    font-size: 22px;
+  }
+  .manager-view .wordmark > span,
+  .manager-view .wordmark small {
+    display: none;
+  }
+  .manager-toolbar {
+    gap: 1px;
+    margin-right: 6px;
+  }
   .public-view .topbar {
     top: 9px;
     right: 9px;
@@ -2979,112 +2864,6 @@ th {
   }
   .public-view .public-map-toolbar .public-sls-filter {
     top: 58px;
-    right: 0;
-    left: auto;
-    width: min(230px, calc(100vw - 18px));
-  }
-  .public-view .location-panel {
-    top: 176px;
-  }
-  .public-view .detail-panel {
-    top: 176px;
-  }
-  .public-view .leaflet-control-zoom {
-    margin: 185px 10px 0 0 !important;
-  }
-}
-
-/* Kontrol publik bergabung ke dalam header Geovit. */
-.public-view .topbar {
-  padding: 0 16px;
-}
-.public-logo {
-  position: relative;
-  z-index: 961;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border-radius: 10px;
-  background: #287b60;
-  color: #fff;
-  box-shadow: 0 2px 7px #1c604a2e;
-}
-.public-view .header-right {
-  position: relative;
-  z-index: 961;
-}
-.public-view .public-map-toolbar {
-  z-index: 960;
-  top: 0;
-  left: 72px;
-  right: 160px;
-  width: auto;
-  max-width: none;
-  padding: 5px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.public-view .public-map-toolbar .search-field {
-  border-color: transparent;
-  background: #f7faf8;
-}
-.public-view .public-map-toolbar .public-filter-toggle,
-.public-view .public-map-toolbar .public-data-toggle {
-  flex: 0 0 42px;
-  width: 42px;
-  padding: 0;
-  background: #f7faf8;
-  font-size: 0;
-}
-.public-view .public-map-toolbar .public-sls-filter {
-  top: 58px;
-}
-
-@media (max-width: 640px) {
-  .public-view .topbar {
-    padding: 0 12px;
-  }
-  .public-view .login-button > span,
-  .public-view .login-button > svg:last-child,
-  .public-view .public-map-toolbar kbd {
-    display: none;
-  }
-  .public-view .header-right {
-    gap: 0;
-  }
-  .public-view .login-button {
-    width: 38px;
-    height: 38px;
-    padding: 0;
-    justify-content: center;
-    border-radius: 8px;
-  }
-  .public-view .public-map-toolbar {
-    top: 0;
-    left: 66px;
-    right: 58px;
-    width: auto;
-    padding: 5px 0;
-  }
-  .public-view .public-map-toolbar .search-field {
-    min-width: 0;
-  }
-  .public-view .public-data-toggle {
-    width: 40px;
-    flex-basis: 40px;
-    padding: 0;
-  }
-  .public-view .public-data-toggle svg {
-    margin: 0;
-  }
-  .public-view .public-data-toggle {
-    font-size: 0;
-  }
-  .public-view .public-map-toolbar .public-sls-filter {
-    top: 58px;
     right: -49px;
     width: min(230px, calc(100vw - 18px));
   }
@@ -3109,5 +2888,51 @@ th {
   }
   .public-view .map-workspace.public-list-open .location-panel {
     transform: translateY(0);
+  }
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }

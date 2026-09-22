@@ -1,6 +1,6 @@
 "use client";
-import dynamic from "next/dynamic";
 import type { Location, SLS } from "@/lib/data";
+import dynamic from "next/dynamic";
 export type PolygonPoint = [number, number];
 export type MapProps = {
   markers: Location[];
@@ -17,6 +17,7 @@ export type MapProps = {
   polygon?: PolygonPoint[];
   polygonEditable?: boolean;
   onPolygonChange?: (points: PolygonPoint[]) => void;
+  fitPoints?: PolygonPoint[] | null;
 };
 const LeafletProvider = dynamic(() => import("./map-leaflet"), {
   ssr: false,
