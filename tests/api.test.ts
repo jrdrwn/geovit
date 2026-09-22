@@ -100,6 +100,30 @@ test(
               .status,
             403,
           );
+          const linkedSls = await post(
+            { action: "delete-sls", id: region },
+            adminCookie,
+          );
+          assert.equal(linkedSls.status, 409);
+          assert.match(
+            (await linkedSls.json()).error,
+            /SLS masih dipakai oleh lokasi/,
+          );
+          const emptyRegion = "empty-sls-" + suffix;
+          await pool.query("INSERT INTO sls(id,code,name) VALUES($1,$2,$3)", [
+            emptyRegion,
+            "SLS-EMPTY-" + suffix,
+            "Empty SLS",
+          ]);
+          assert.equal(
+            (await post({ action: "delete-sls", id: emptyRegion }, adminCookie))
+              .status,
+            200,
+          );
+          const deleted = await pool.query("SELECT id FROM sls WHERE id=$1", [
+            emptyRegion,
+          ]);
+          assert.equal(deleted.rowCount, 0);
           assert.equal((await fetch(base + "/api/data?manage=1")).status, 401);
         },
       );

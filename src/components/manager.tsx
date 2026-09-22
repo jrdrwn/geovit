@@ -62,7 +62,8 @@ export default function Manager({
     >([]),
     [importName, setImportName] = useState(""),
     [slsEdit, setSlsEdit] = useState<SLS | null>(null),
-    [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+    [commentToDelete, setCommentToDelete] = useState<string | null>(null),
+    [slsToDelete, setSlsToDelete] = useState<SLS | null>(null);
   const [polygon, setPolygon] = useState<[number, number][]>(
     slsEdit?.boundary || [],
   );
@@ -542,7 +543,7 @@ export default function Manager({
             <article key={c.id}>
               <header>
                 <strong>{c.name}</strong>
-                <span className="sls-tag">{c.status}</span>
+                <span className="sls-tag">Publik</span>
               </header>
               <p>{c.comment}</p>
               <small>
@@ -595,6 +596,7 @@ export default function Manager({
                   {s.code} · {s.name}
                 </strong>
                 <button
+                  type="button"
                   onClick={() => {
                     setSlsEdit(s);
                     setPolygon(s.boundary || []);
@@ -603,12 +605,9 @@ export default function Manager({
                   Edit
                 </button>
                 <button
+                  type="button"
                   title="Hapus SLS kosong"
-                  onClick={() => {
-                    setSlsEdit(s);
-                    setPolygon(s.boundary || []);
-                    setConfirmDelete(true);
-                  }}
+                  onClick={() => setSlsToDelete(s)}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -731,14 +730,16 @@ export default function Manager({
               </button>
             </div>
           </form>
-          {confirmDelete && slsEdit && (
+          {slsToDelete && (
             <div className="info-box">
-              Hapus {slsEdit.code}? SLS yang memiliki lokasi tidak bisa dihapus.
+              Hapus {slsToDelete.code}? SLS yang masih memiliki lokasi tidak
+              dapat dihapus.
               <button
+                type="button"
                 className="danger"
                 onClick={() =>
                   perform(
-                    { action: "delete-sls", id: slsEdit.id },
+                    { action: "delete-sls", id: slsToDelete.id },
                     "SLS dihapus.",
                     true,
                   )
@@ -746,7 +747,9 @@ export default function Manager({
               >
                 Hapus
               </button>
-              <button onClick={() => setConfirmDelete(false)}>Batal</button>
+              <button type="button" onClick={() => setSlsToDelete(null)}>
+                Batal
+              </button>
             </div>
           )}
         </>

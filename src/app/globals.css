@@ -1519,6 +1519,41 @@ h1 > span {
 .manager-tabs > button:last-child {
   margin-left: auto;
 }
+.modal-wide .manager-tabs {
+  position: sticky;
+  z-index: 2;
+  top: -32px;
+  margin-right: -32px;
+  margin-left: -32px;
+  padding: 15px 32px;
+  background: #fff;
+  box-shadow: 0 7px 13px #253d2b0b;
+}
+.manager-tabs button {
+  border: 1px solid transparent;
+}
+.manager-tabs .active {
+  border-color: #d5e8da;
+}
+.region-list,
+.moderation-list {
+  max-height: 300px;
+  overflow: auto;
+  padding: 4px 13px;
+  border: 1px solid #e5ece5;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+.region-list {
+  margin: 14px 0 20px;
+}
+.region-edit-row {
+  min-height: 50px;
+  padding: 8px 0;
+}
+.moderation-list article {
+  background: #fff;
+}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2273,6 +2308,19 @@ th {
   .manager-tabs button {
     padding: 8px;
     font-size: 10px;
+  }
+  .modal-wide .manager-tabs {
+    top: -27px;
+    margin-right: -21px;
+    margin-left: -21px;
+    padding: 12px 21px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .manager-tabs > button:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
   }
   .toast {
     font-size: 11px;

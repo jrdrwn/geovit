@@ -347,7 +347,21 @@ export async function POST(req: NextRequest) {
           .where(eq(sls.id, id));
       else await db.insert(sls).values({ ...input, id: crypto.randomUUID() });
     } else if (action === "delete-sls") {
-      await db.delete(sls).where(eq(sls.id, z.string().parse(body.id)));
+      const id = z.string().parse(body.id);
+      const linkedLocation = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(eq(locations.sls_id, id))
+        .limit(1);
+      if (linkedLocation.length)
+        return Response.json(
+          {
+            error:
+              "SLS masih dipakai oleh lokasi. Pindahkan atau hapus lokasi tersebut terlebih dahulu.",
+          },
+          { status: 409 },
+        );
+      await db.delete(sls).where(eq(sls.id, id));
     } else if (action === "moderate") {
       await db
         .update(comments)
